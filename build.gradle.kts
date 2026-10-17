@@ -1,6 +1,6 @@
 plugins {
     id("java-library")
-    id("xyz.jpenilla.run-paper") version "3.1.0"
+    id("xyz.jpenilla.run-paper") version "2.3.1"
 }
 
 repositories {
@@ -31,4 +31,17 @@ tasks {
             expand(props)
         }
     }
+}
+tasks.runServer {
+    minecraftVersion("1.21.4")
+}
+tasks.register<Copy>("deployPlugin") {
+    dependsOn(tasks.named("jar"))
+    from(tasks.named<Jar>("jar").map { it.archiveFile })
+    into(file("${System.getProperty("user.home")}/server-test/plugins"))
+}
+
+// Déclenche automatiquement le déploiement après chaque build
+tasks.named("build") {
+    finalizedBy("deployPlugin")
 }

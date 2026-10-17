@@ -1,6 +1,182 @@
-name: test
-version: '${version}'
-
+name: Test
+version: '1.0-SNAPSHOT'
 main: fr.anas.test.Test
-api-version: '1.21.4'
-load: POSTWORLD
+api-version: '1.21'
+
+commands:
+  bienvenue:
+    description: Envoie un message de bienvenue à un joueur
+    usage: /bienvenue <joueur>
+    permission: test.bienvenue
+    permission-message: §cTu n'as pas la permission d'utiliser cette commande !
+
+  trail:
+    description: Gère les particules d'un joueur en ligne de commande
+    usage: /trail <joueur> <coeur|flamme|etoile|fumee|eclair|stop>
+    permission: test.trail.admin
+    permission-message: §cCette commande est réservée aux administrateurs !
+
+  trails:
+    description: Ouvre le menu des particules cosmétiques
+    usage: /trails
+
+  spawn:
+    description: Se téléporte au point de spawn après un délai
+    usage: /spawn
+
+  broadcast:
+    description: Envoie un message d'alerte à tout le serveur
+    aliases: [bc]
+    usage: /broadcast <message>
+    permission: test.broadcast.admin
+    permission-message: §cCette commande est réservée aux administrateurs !
+
+  freeze:
+    description: Gèle ou dégèle un joueur
+    usage: /freeze <joueur>
+    permission: test.moderation.freeze
+    permission-message: §cCette commande est réservée aux modérateurs !
+
+  clearchat:
+    description: Nettoie le chat général
+    aliases: [cc]
+    usage: /clearchat
+    permission: test.moderation.clearchat
+    permission-message: §cCette commande est réservée aux modérateurs !
+
+  kit:
+    description: Récupère un kit d'équipement
+    usage: /kit <starter>
+    permission: test.kit.use
+
+  tpa:
+    description: Demande à se téléporter auprès d'un joueur
+    usage: /tpa <joueur>
+  tpaccept:
+    description: Accepte la demande de téléportation en attente
+    usage: /tpaccept
+  tpdeny:
+    description: Refuse la demande de téléportation en attente
+    usage: /tpdeny
+
+  sethome:
+    description: Enregistre ta position actuelle comme point de base
+    usage: /sethome
+  home:
+    description: Se téléporte à ton point de base après 3 secondes
+    usage: /home
+
+  menu:
+    description: Ouvre le menu des destinations rapides
+    aliases: [ warp, warps ]
+    usage: /menu
+
+  mod:
+    description: Ouvre le menu d'administration pour un joueur cible
+    usage: /mod <joueur>
+    permission: test.moderation.mod
+    permission-message: §cCette commande est réservée à l'équipe de modération !
+
+  kits:
+    description: Ouvre le menu visuel des kits disponibles
+    usage: /kits
+    permission: test.kit.use
+
+  setrank:
+    description: Modifie le rang d'un joueur
+    usage: /setrank <joueur> <JOUEUR|VIP|MODO|ADMIN>
+    permission: test.admin.rank
+    permission-message: §cCette commande est réservée aux administrateurs !
+
+  mute:
+    description: Réduit un joueur au silence temporairement ou définitivement
+    usage:
+      /mute <joueur> [durée: 10m, 2h, 1d]
+    permission: test.moderation.mute
+  unmute:
+    description: Retire le silence d'un joueur
+    usage: /unmute <joueur>
+    permission: test.moderation.mute
+
+  money:
+    description: Affiche ton solde ou celui d'un autre joueur
+    aliases: [ bal, balance ]
+    usage: /money [joueur]
+  pay:
+    description: Envoie de l'argent à un autre joueur
+    usage: /pay <joueur> <montant>
+  shop:
+    description: Ouvre la boutique du serveur
+    usage: /shop
+
+  eco:
+    description: Gère l'économie d'un joueur
+    usage: /eco <give|take|set> <joueur> <montant>
+    permission: test.admin.eco
+    permission-message: §cCette commande est réservée aux administrateurs !
+
+  jobs:
+    description: Affiche la progression de vos métiers
+    aliases: [ job, metiers ]
+    usage: /jobs
+
+  quests:
+    description: Affiche vos quêtes journalières
+    aliases: [ quest, quetes ]
+    usage: /quests
+
+
+
+permissions:
+  test.bienvenue:
+    description: Permet d'utiliser la commande /bienvenue
+    default: true
+
+  test.bienvenue.bypass:
+    description: Permet d'ignorer le cooldown de la commande /bienvenue
+    default: op
+
+  test.trail.admin:
+    description: Permet d'activer ou retirer les particules d'un joueur
+    default: op
+
+  test.broadcast.admin:
+    description: Permet d'envoyer des annonces globales
+    default: op
+
+  test.moderation.freeze:
+    description: Permet de geler et dégeler un joueur
+    default: op
+
+  test.moderation.clearchat:
+    description: Permet de nettoyer le chat
+    default: op
+
+  test.kit.use:
+    description: Permet de réclamer des kits
+    default: true
+
+  test.kit.bypass:
+    description: Permet d'ignorer le délai d'attente des kits
+    default: op
+
+  test.moderation.mod:
+    description: Permet d'ouvrir le menu de modération rapide
+    default: op
+
+  test.admin.eco:
+    description: Permet de manipuler les soldes des joueurs
+    default: op
+
+  chunks:
+    max-auto-save-chunks-per-tick: 24
+    prevent-moving-into-unloaded-chunks: true
+
+  entities:
+    armor-stands:
+      tick: false
+    spawning:
+      all-chunks-are-slime-chunks: false
+
+  collisions:
+    max-entity-collisions: 8
