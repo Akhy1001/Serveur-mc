@@ -66,7 +66,7 @@ public class MenuListener implements Listener {
                 plugin.getSpawnManager().startTeleport(player);
             } else if (clickedItem.getType() == Material.RED_BED) {
                 player.closeInventory();
-                plugin.getHomeManager().startTeleportHome(player);
+                plugin.getHomeManager().teleportToHome(player);
             }
             return;
         }

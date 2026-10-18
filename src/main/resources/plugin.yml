@@ -59,13 +59,6 @@ commands:
     description: Refuse la demande de téléportation en attente
     usage: /tpdeny
 
-  sethome:
-    description: Enregistre ta position actuelle comme point de base
-    usage: /sethome
-  home:
-    description: Se téléporte à ton point de base après 3 secondes
-    usage: /home
-
   menu:
     description: Ouvre le menu des destinations rapides
     aliases: [ warp, warps ]
@@ -124,6 +117,26 @@ commands:
     description: Affiche vos quêtes journalières
     aliases: [ quest, quetes ]
     usage: /quests
+
+  claim:
+    description: Revendique le chunk actuel contre 100 pièces
+    usage: /claim
+  unclaim:
+    description: Libère la protection du chunk actuel
+    usage: /unclaim
+  trust:
+    description: Autorise un joueur dans ta parcelle
+    usage: /trust <joueur>
+  untrust:
+    description: Retire les droits d'un joueur dans ta parcelle
+    usage: /untrust <joueur>
+
+  sethome:
+    description: Enregistre ta position actuelle comme point de base
+    usage: /sethome
+  home:
+    description: Te téléporte à ton point de base
+    usage: /home
 
 
 

@@ -34,119 +34,112 @@ public class HomeManager implements Listener {
         data.setHome(player.getLocation());
         plugin.getDataManager().save();
 
-        player.sendMessage(Component.text("Point de base enregistré avec succès !", NamedTextColor.GREEN));
-        player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_CHIME, 1.0f, 1.5f);
+        player.playSound(player.getLocation(), Sound.BLOCK_RESPAWN_ANCHOR_SET_SPAWN, 1.0f, 1.2f);
+        player.sendMessage(Component.text("✔ Ton point de base (home) a été enregistré ici !", NamedTextColor.GREEN));
     }
 
     public void startTeleportHome(Player player) {
+        teleportToHome(player);
+    }
+
+    public void teleportToHome(Player player) {
+        PlayerData data = plugin.getDataManager().getPlayerData(player.getUniqueId());
+
+        if (!data.hasHome() || data.getHomeLocation() == null) {
+            player.sendMessage(Component.text("Tu n'as défini aucun home ! Utilise d'abord /sethome.", NamedTextColor.RED));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return;
+        }
+
+        // Vérification du combat tag
+        if (plugin.getCombatLogManager() != null && plugin.getCombatLogManager().isInCombat(player)) {
+            player.sendMessage(Component.text("Impossible de te téléporter en plein combat !", NamedTextColor.RED));
+            return;
+        }
+
         UUID uuid = player.getUniqueId();
-        PlayerData data = plugin.getDataManager().getPlayerData(uuid);
+        cancelTeleport(uuid, false);
 
-        if (!data.hasHome()) {
-            player.sendMessage(Component.text("Tu n'as pas encore défini de home. Utilise /sethome d'abord !", NamedTextColor.RED));
+        // Téléportation instantanée pour les administrateurs
+        if (player.hasPermission("test.teleport.instant") || player.isOp()) {
+            executeTeleport(player, data.getHomeLocation());
             return;
         }
 
-        Location targetLoc = data.getHomeLocation();
-        if (targetLoc == null || targetLoc.getWorld() == null) {
-            player.sendMessage(Component.text("Le monde de ton home est introuvable !", NamedTextColor.RED));
-            return;
-        }
-
-        if (pendingTeleports.containsKey(uuid)) {
-            player.sendMessage(Component.text("Téléportation déjà en cours !", NamedTextColor.RED));
-            return;
-        }
-
-        player.sendMessage(Component.text("Téléportation vers ton home dans 3 secondes... Ne bouge pas !", NamedTextColor.GOLD));
+        Location startLoc = player.getLocation();
 
         BukkitTask task = new BukkitRunnable() {
-            int secondsLeft = 3;
+            int countdown = 3;
 
             @Override
             public void run() {
                 if (!player.isOnline()) {
-                    cancelTeleport(uuid);
-                    return;
-                }
-
-                if (secondsLeft == 0) {
-                    player.teleport(targetLoc);
-
-                    Title endTitle = Title.title(
-                            Component.text("HOME", NamedTextColor.GREEN, TextDecoration.BOLD),
-                            Component.text("Bienvenue chez toi !", NamedTextColor.GRAY),
-                            Title.Times.times(Duration.ofMillis(100), Duration.ofMillis(1000), Duration.ofMillis(300))
-                    );
-                    player.showTitle(endTitle);
-                    player.playSound(targetLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
-                    player.getWorld().spawnParticle(Particle.PORTAL, targetLoc.clone().add(0, 1, 0), 30, 0.4, 0.6, 0.4, 0.1);
-
-                    pendingTeleports.remove(uuid);
                     cancel();
+                    pendingTeleports.remove(uuid);
                     return;
                 }
 
-                NamedTextColor color = switch (secondsLeft) {
-                    case 3 -> NamedTextColor.RED;
-                    case 2 -> NamedTextColor.GOLD;
-                    default -> NamedTextColor.YELLOW;
-                };
-
-                Title title = Title.title(
-                        Component.text(String.valueOf(secondsLeft), color, TextDecoration.BOLD),
-                        Component.text("Retour à la base...", NamedTextColor.GRAY),
-                        Title.Times.times(Duration.ofMillis(100), Duration.ofMillis(800), Duration.ofMillis(100))
-                );
-                player.showTitle(title);
-                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 1.0f, 1.2f);
-                player.getWorld().spawnParticle(Particle.PORTAL, player.getLocation().add(0, 0.5, 0), 15, 0.3, 0.5, 0.3, 0.1);
-
-                secondsLeft--;
+                if (countdown > 0) {
+                    Title title = Title.title(
+                            Component.text("Téléportation...", NamedTextColor.GOLD, TextDecoration.BOLD),
+                            Component.text(countdown + " seconde" + (countdown > 1 ? "s" : "") + " (ne bouge pas)", NamedTextColor.YELLOW),
+                            Title.Times.times(Duration.ZERO, Duration.ofMillis(1200), Duration.ofMillis(200))
+                    );
+                    player.showTitle(title);
+                    player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.7f, 1.0f);
+                    countdown--;
+                } else {
+                    cancel();
+                    pendingTeleports.remove(uuid);
+                    executeTeleport(player, data.getHomeLocation());
+                }
             }
         }.runTaskTimer(plugin, 0L, 20L);
 
         pendingTeleports.put(uuid, task);
     }
 
-    public void cancelTeleport(UUID uuid) {
-        if (pendingTeleports.containsKey(uuid)) {
-            pendingTeleports.get(uuid).cancel();
-            pendingTeleports.remove(uuid);
+    private void executeTeleport(Player player, Location targetLoc) {
+        player.teleportAsync(targetLoc).thenAccept(success -> {
+            if (success) {
+                player.playSound(targetLoc, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
+                targetLoc.getWorld().spawnParticle(Particle.PORTAL, targetLoc.clone().add(0, 1, 0), 40, 0.5, 0.5, 0.5, 0.1);
+                player.sendMessage(Component.text("✦ Téléportation à ton home réussie !", NamedTextColor.GREEN));
+            }
+        });
+    }
 
-            Player player = plugin.getServer().getPlayer(uuid);
-            if (player != null && player.isOnline()) {
-                player.clearTitle();
+    public void cancelTeleport(UUID uuid, boolean notify) {
+        BukkitTask task = pendingTeleports.remove(uuid);
+        if (task != null) {
+            task.cancel();
+            if (notify) {
+                Player player = plugin.getServer().getPlayer(uuid);
+                if (player != null) {
+                    player.clearTitle();
+                    player.sendMessage(Component.text("✖ Téléportation annulée (tu as bougé ou subi des dégâts) !", NamedTextColor.RED));
+                    player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+                }
             }
         }
     }
 
     @EventHandler
     public void onMove(PlayerMoveEvent event) {
-        Player player = event.getPlayer();
-        UUID uuid = player.getUniqueId();
+        if (!pendingTeleports.containsKey(event.getPlayer().getUniqueId())) return;
 
-        if (pendingTeleports.containsKey(uuid)) {
-            Location from = event.getFrom();
-            Location to = event.getTo();
-
-            if (from.getBlockX() != to.getBlockX() || from.getBlockY() != to.getBlockY() || from.getBlockZ() != to.getBlockZ()) {
-                cancelTeleport(uuid);
-                player.sendMessage(Component.text("Téléportation annulée : tu as bougé !", NamedTextColor.RED));
-                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
-            }
+        // Annulation seulement si déplacement de bloc entier (pas simple mouvement de tête)
+        Location from = event.getFrom();
+        Location to = event.getTo();
+        if (from.getBlockX() != to.getBlockX() || from.getBlockY() != to.getBlockY() || from.getBlockZ() != to.getBlockZ()) {
+            cancelTeleport(event.getPlayer().getUniqueId(), true);
         }
     }
 
     @EventHandler
     public void onDamage(EntityDamageEvent event) {
         if (event.getEntity() instanceof Player player) {
-            UUID uuid = player.getUniqueId();
-            if (pendingTeleports.containsKey(uuid)) {
-                cancelTeleport(uuid);
-                player.sendMessage(Component.text("Téléportation annulée : dégâts subis !", NamedTextColor.RED));
-                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
-            }
+            cancelTeleport(player.getUniqueId(), true);
         }
     }
 }

@@ -14,6 +14,7 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.Chunk;
 
 
 import java.util.*;
@@ -38,6 +39,8 @@ public final class Test extends JavaPlugin implements CommandExecutor, TabComple
     private ProtectionManager protectionManager;
     private JobManager jobManager;
     private QuestManager questManager;
+    private ClaimManager claimManager;
+
 
 
     private static final List<String> PARTICLES_OPTIONS = List.of(
@@ -59,6 +62,7 @@ public final class Test extends JavaPlugin implements CommandExecutor, TabComple
         this.protectionManager = new ProtectionManager(this);
         this.jobManager = new JobManager(this);
         this.questManager = new QuestManager(this);
+        this.claimManager = new ClaimManager(this);
 
         // Enregistrement des listeners
         getServer().getPluginManager().registerEvents(new PlayerJoinListener(this), this);
@@ -73,6 +77,7 @@ public final class Test extends JavaPlugin implements CommandExecutor, TabComple
         getServer().getPluginManager().registerEvents(protectionManager, this);
         getServer().getPluginManager().registerEvents(jobManager, this);
         getServer().getPluginManager().registerEvents(questManager, this);
+        getServer().getPluginManager().registerEvents(claimManager, this);
 
         // Initialisation pour les joueurs en ligne
         for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
@@ -112,6 +117,10 @@ public final class Test extends JavaPlugin implements CommandExecutor, TabComple
         registerCommand("eco");
         registerCommand("jobs");
         registerCommand("quests");
+        registerCommand("claim");
+        registerCommand("unclaim");
+        registerCommand("trust");
+        registerCommand("untrust");
 
 
 
@@ -175,6 +184,10 @@ public final class Test extends JavaPlugin implements CommandExecutor, TabComple
             case "eco" -> handleEco(sender, args);
             case "jobs" -> handleJobs(sender);
             case "quests" -> handleQuests(sender);
+            case "claim" -> handleClaim(sender);
+            case "unclaim" -> handleUnclaim(sender);
+            case "trust" -> handleTrust(sender, args);
+            case "untrust" -> handleUntrust(sender, args);
 
 
 
@@ -183,6 +196,133 @@ public final class Test extends JavaPlugin implements CommandExecutor, TabComple
     }
 
     // --- HANDLERS DES COMMANDES ---
+
+    private boolean handleClaim(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Seul un joueur peut revendiquer une zone.", NamedTextColor.RED));
+            return true;
+        }
+
+        Chunk chunk = player.getLocation().getChunk();
+        if (claimManager.isChunkClaimed(chunk)) {
+            sender.sendMessage(Component.text("Ce chunk est déjà revendiqué !", NamedTextColor.RED));
+            return true;
+        }
+
+        PlayerData data = dataManager.getPlayerData(player.getUniqueId());
+        if (!data.removeBalance(ClaimManager.CLAIM_PRICE)) {
+            sender.sendMessage(Component.text("Fonds insuffisants ! Il te faut " + ClaimManager.CLAIM_PRICE + " pièces.", NamedTextColor.RED));
+            return true;
+        }
+
+        dataManager.save();
+        if (scoreboardManager != null) {
+            scoreboardManager.updateScoreboard(player);
+        }
+
+        Claim claim = new Claim(chunk.getWorld().getName(), chunk.getX(), chunk.getZ(), player.getUniqueId());
+        claimManager.addClaim(claim);
+
+        player.sendMessage(Component.text("✦ Parcelle revendiquée avec succès ! (-" + ClaimManager.CLAIM_PRICE + " ⛃)", NamedTextColor.GREEN));
+        return true;
+    }
+
+    private boolean handleUnclaim(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Commande réservée aux joueurs.", NamedTextColor.RED));
+            return true;
+        }
+
+        Chunk chunk = player.getLocation().getChunk();
+        Claim claim = claimManager.getClaim(chunk);
+
+        if (claim == null) {
+            sender.sendMessage(Component.text("Ce chunk n'appartient à personne.", NamedTextColor.RED));
+            return true;
+        }
+
+        if (!claim.getOwner().equals(player.getUniqueId()) && !player.isOp()) {
+            sender.sendMessage(Component.text("Tu n'es pas le propriétaire de cette parcelle !", NamedTextColor.RED));
+            return true;
+        }
+
+        claimManager.removeClaim(chunk);
+        player.sendMessage(Component.text("Cette parcelle est désormais libérée.", NamedTextColor.YELLOW));
+        return true;
+    }
+
+    private boolean handleTrust(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Commande réservée aux joueurs.", NamedTextColor.RED));
+            return true;
+        }
+
+        if (args.length == 0) {
+            player.sendMessage(Component.text("Utilisation : /trust <joueur>", NamedTextColor.RED));
+            return true;
+        }
+
+        Chunk chunk = player.getLocation().getChunk();
+        Claim claim = claimManager.getClaim(chunk);
+
+        if (claim == null || (!claim.getOwner().equals(player.getUniqueId()) && !player.isOp())) {
+            player.sendMessage(Component.text("Tu dois te trouver sur l'une de tes parcelles pour ajouter un joueur !", NamedTextColor.RED));
+            return true;
+        }
+
+        Player target = Bukkit.getPlayerExact(args[0]);
+        if (target == null) {
+            player.sendMessage(Component.text("Joueur introuvable ou déconnecté.", NamedTextColor.RED));
+            return true;
+        }
+
+        if (target.getUniqueId().equals(player.getUniqueId())) {
+            player.sendMessage(Component.text("Tu es déjà le propriétaire de cette parcelle.", NamedTextColor.RED));
+            return true;
+        }
+
+        if (!claim.getTrusted().contains(target.getUniqueId())) {
+            claim.getTrusted().add(target.getUniqueId());
+            claimManager.saveClaims();
+            player.sendMessage(Component.text(target.getName() + " a désormais accès à cette parcelle.", NamedTextColor.GREEN));
+            target.sendMessage(Component.text("Tu as été ajouté aux permissions de la parcelle de " + player.getName() + " !", NamedTextColor.GOLD));
+        } else {
+            player.sendMessage(Component.text(target.getName() + " a déjà les droits ici.", NamedTextColor.YELLOW));
+        }
+        return true;
+    }
+
+    private boolean handleUntrust(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Commande réservée aux joueurs.", NamedTextColor.RED));
+            return true;
+        }
+
+        if (args.length == 0) {
+            player.sendMessage(Component.text("Utilisation : /untrust <joueur>", NamedTextColor.RED));
+            return true;
+        }
+
+        Chunk chunk = player.getLocation().getChunk();
+        Claim claim = claimManager.getClaim(chunk);
+
+        if (claim == null || (!claim.getOwner().equals(player.getUniqueId()) && !player.isOp())) {
+            player.sendMessage(Component.text("Tu dois te trouver sur l'une de tes parcelles !", NamedTextColor.RED));
+            return true;
+        }
+
+        Player target = Bukkit.getPlayerExact(args[0]);
+        UUID targetUuid = target != null ? target.getUniqueId() : null;
+
+        if (targetUuid != null && claim.getTrusted().remove(targetUuid)) {
+            claimManager.saveClaims();
+            player.sendMessage(Component.text(target.getName() + " a été retiré de ta parcelle.", NamedTextColor.YELLOW));
+            target.sendMessage(Component.text("Tes permissions ont été révoquées sur la parcelle de " + player.getName() + ".", NamedTextColor.RED));
+        } else {
+            player.sendMessage(Component.text("Ce joueur n'était pas autorisé sur cette parcelle.", NamedTextColor.RED));
+        }
+        return true;
+    }
 
     private boolean handleQuests(CommandSender sender) {
         if (!(sender instanceof Player player)) {
@@ -799,6 +939,10 @@ public final class Test extends JavaPlugin implements CommandExecutor, TabComple
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         String name = command.getName().toLowerCase();
 
+        if ((name.equals("trust") || name.equals("untrust")) && args.length == 1) {
+            return null;
+        }
+
         if (name.equals("spawn") || name.equals("trails") || name.equals("broadcast")
                 || name.equals("clearchat") || name.equals("menu")
                 || name.equals("sethome") || name.equals("home")
@@ -884,6 +1028,10 @@ public final class Test extends JavaPlugin implements CommandExecutor, TabComple
 
     // --- GETTERS PUBLICS ---
 
+    public ClaimManager getClaimManager() {
+        return claimManager;
+    }
+
     public QuestManager getQuestManager() {
         return questManager;
     }
@@ -911,6 +1059,7 @@ public final class Test extends JavaPlugin implements CommandExecutor, TabComple
     public HomeManager getHomeManager() {
         return homeManager;
     }
+
 
     public CombatLogManager getCombatLogManager() {
         return combatLogManager;
